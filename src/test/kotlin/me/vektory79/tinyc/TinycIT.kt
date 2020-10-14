@@ -20,7 +20,7 @@ internal class TinycIT {
     @Test
     @Order(1)
     fun test1() {
-        assertEquals(0, compileTest(1), "The compilation should be completed successfully")
+        assertEquals(0, compileTest(1, 1), "The compilation should be completed successfully")
         assertEquals("Hello, world!!!\n", runTest("Main"))
         assertClassesPresent(
             "Main",
@@ -31,7 +31,7 @@ internal class TinycIT {
     @Test
     @Order(2)
     fun test2() {
-        assertEquals(0, compileTest(2), "The compilation should be completed successfully")
+        assertEquals(0, compileTest(2, 1), "The compilation should be completed successfully")
         assertEquals("Hello, world!!!\n", runTest("Main"))
         assertClassesPresent(
             "Main",
@@ -44,7 +44,7 @@ internal class TinycIT {
     @Test
     @Order(3)
     fun test3() {
-        assertEquals(0, compileTest(3), "The compilation should be completed successfully")
+        assertEquals(0, compileTest(3, 2), "The compilation should be completed successfully")
         assertEquals("Hello, world!!!\n", runTest("test.package1.Main"))
         assertClassesPresent(
             "test.package1.Main",
@@ -59,8 +59,8 @@ internal class TinycIT {
     @Order(4)
     fun test4() {
         // Ensure, that the file modification is countable between two tests
-        Thread.sleep(1)
-        assertEquals(0, compileTest(4, clean = false), "The compilation should be completed successfully")
+        Thread.sleep(1000)
+        assertEquals(0, compileTest(4, 1, clean = false), "The compilation should be completed successfully")
         assertEquals("Hello, world, ever!!!\n", runTest("test.package1.Main"))
         assertClassesPresent(
             "test.package1.Main",
@@ -69,20 +69,12 @@ internal class TinycIT {
         assertClassesNotPresent(
             "Main"
         )
-
-        assertTrue(
-            Files.getLastModifiedTime(classToPath("test.package1.Main")) <
-            Files.getLastModifiedTime(classToPath("test.package2.Controller")),
-            "The class Main should be older, than Controller"
-        )
     }
 
     @Test
     @Order(5)
     fun test5() {
-        // Ensure, that the file modification is countable between two tests
-        Thread.sleep(1)
-        assertEquals(0, compileTest(5), "The compilation should be completed successfully")
+        assertEquals(0, compileTest(5, 1), "The compilation should be completed successfully")
         assertEquals("Hello, world!!!\n", runTest("test.package1.Main"))
         assertClassesPresent(
             "test.package1.Main",
@@ -97,18 +89,25 @@ internal class TinycIT {
         )
     }
 
-    private fun compileTest(num: Int, classpath: String? = null, clean: Boolean = true): Int {
+    @Test
+    @Order(6)
+    fun test6() {
+        assertEquals(1, compileTest(6, 1), "Compilation should file")
+    }
+
+    private fun compileTest(testId: Int, filesToCompile: Int, classpath: String? = null, clean: Boolean = true): Int {
         if (Files.exists(SRC_DIR) && clean) {
             FileUtils.cleanDirectory(SRC_DIR.toFile())
         }
         FileUtils.copyDirectory(
-            TESTS_DIR.resolve("test$num").toFile(),
+            TESTS_DIR.resolve("test$testId").toFile(),
             SRC_DIR.toFile(),
             false
         )
-        return ProcessExecutor()
+        val processResult = ProcessExecutor()
             .command(
                 JAVA_PATH.toString(),
+//                "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:8000",
                 "-jar",
                 TINYC_JAR.toString(),
                 "--sourceroot",
@@ -120,7 +119,10 @@ internal class TinycIT {
             .redirectOutput(Slf4jStream.of(Tinyc::class.java).asInfo())
             .readOutput(true)
             .execute()
-            .exitValue
+        if (processResult.exitValue == 0) {
+            assertEquals(R["CompilationResult", filesToCompile] + "\n", processResult.outputUTF8())
+        }
+        return processResult.exitValue
     }
 
     private fun runTest(mainClass: String, classpath: String? = null): String {
