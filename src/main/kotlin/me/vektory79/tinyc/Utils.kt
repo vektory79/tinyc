@@ -85,7 +85,7 @@ fun compile(config: Tinyc, forCompile: ArrayList<FileInfo>) {
             "-g",
             "-target",
             "11",
-            * if (config.classpath != null) arrayOf("--classpath", config.classpath) else arrayOf()
+            * if (config.classpath != null) arrayOf("-classpath", config.classpath) else arrayOf()
         )
         .redirectOutput(Slf4jStream.of(Tinyc::class.java).asInfo())
         .readOutput(true)
