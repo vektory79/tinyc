@@ -20,7 +20,7 @@ Options:
   -h, --help               Show this help message and exit.
   -s, --sourceroot=<directory>
                            Specify where to find sources root folder.
-                           Default: '/media/data/java/tinyc'
+                           Default: '.'
   -V, --version            Print version information and exit.
 
 Exit codes:
