@@ -54,7 +54,9 @@ abstract class FileStructure(protected val root: Path, private val extension: St
             .filter { it.toString().endsWith(extension) }
             .map { root.relativize(it) }
             .forEach { file ->
-                paths.computeIfAbsent(file.parent ?: Paths.get(".")) { HashMap<Path, FileInfo>() }[file.fileName] = createFileInfo(file)
+                paths.computeIfAbsent(file.parent ?: Paths.get(".")) {
+                    HashMap<Path, FileInfo>()
+                }[file.fileName] = createFileInfo(file)
             }
     }
 

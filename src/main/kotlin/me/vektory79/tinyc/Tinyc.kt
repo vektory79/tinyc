@@ -9,6 +9,7 @@ import picocli.CommandLine.Option
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.util.concurrent.Callable
 import java.util.logging.LogManager
 
 /**
@@ -19,7 +20,7 @@ import java.util.logging.LogManager
     resourceBundle = "me.vektory79.tinyc.Messages",
     version = ["1.0.0"]
 )
-class Tinyc : Runnable {
+class Tinyc : Callable<Int> {
     private companion object {
         private val LOG = LoggerFactory.getLogger(Tinyc::class.java)
         private const val DIR_PLACEHOLDER = "<directory>"
@@ -71,7 +72,7 @@ class Tinyc : Runnable {
     /**
      * The main processing function, tha do all the work.
      */
-    override fun run() {
+    override fun call(): Int {
         try {
             checkEnvironment()
 
@@ -92,6 +93,7 @@ class Tinyc : Runnable {
             compile(this, forCompile)
 
             println(R["CompilationResult", forCompile.size])
+            return 0
         } catch (e: TinycErrorException) {
             // If any error occurred, then print it and return respective error code
             if (e.cause != null) {
@@ -99,7 +101,7 @@ class Tinyc : Runnable {
             } else {
                 LOG.error(e.message)
             }
-            System.exit(e.errorCode)
+            return e.errorCode
         }
     }
 

@@ -6,7 +6,6 @@ import org.objectweb.asm.Opcodes
 import org.zeroturnaround.exec.ProcessExecutor
 import org.zeroturnaround.exec.stream.slf4j.Slf4jStream
 import java.io.BufferedWriter
-import java.io.File
 import java.io.FileWriter
 import java.io.IOException
 import java.nio.charset.StandardCharsets
@@ -85,6 +84,8 @@ fun compile(config: Tinyc, forCompile: ArrayList<FileInfo>) {
             "-g",
             "-target",
             "11",
+            "-encoding",
+            "UTF-8",
             * if (config.classpath != null) arrayOf("-classpath", config.classpath) else arrayOf()
         )
         .redirectOutput(Slf4jStream.of(Tinyc::class.java).asInfo())

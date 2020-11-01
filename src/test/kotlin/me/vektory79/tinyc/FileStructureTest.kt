@@ -27,6 +27,21 @@ internal class FileStructureTest {
         .normalize()
 
     @Test
+    fun scanTest() {
+        classUsageScan(
+            Paths.get("/media/data/java/tinyc/target/test-classes/me/vektory79/tinyc/TestClass.class"),
+            object: UsageScannerCallback {
+                override fun baseType(className: String) {
+
+                }
+                override fun typeUsage(className: String) {
+
+                }
+            }
+        )
+    }
+
+    @Test
     fun buildNewProps() {
         val sourceProps = PropertiesFileStructure(srcRoot.resolve("..").resolve("resources"))
         sourceProps.rebuild()
