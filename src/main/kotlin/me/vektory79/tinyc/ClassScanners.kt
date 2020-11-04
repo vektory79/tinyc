@@ -63,7 +63,8 @@ class ClassAbiScanner(
         superName: String?,
         interfaces: Array<out String>?
     ) {
-        if (access and Opcodes.ACC_PRIVATE == 0) return
+        if (access and Opcodes.ACC_PRIVATE != 0)
+            return
         callback.clazz(access, name, signature, superName, interfaces)
     }
 

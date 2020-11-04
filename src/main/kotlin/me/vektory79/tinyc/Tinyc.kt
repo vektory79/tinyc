@@ -2,6 +2,7 @@
 
 package me.vektory79.tinyc
 
+import me.vektory79.tinyc.abi.FileIndex
 import org.apache.commons.lang3.SystemUtils
 import org.slf4j.LoggerFactory
 import picocli.CommandLine.Command
@@ -68,6 +69,8 @@ class Tinyc : Callable<Int> {
      */
     val javac: Path
         get() = _javac!!
+    
+    internal var compiledFilesPhase1 = 0
 
     /**
      * The main processing function, tha do all the work.
@@ -77,22 +80,12 @@ class Tinyc : Callable<Int> {
             checkEnvironment()
 
             // Scan all sources
-            val javaFiles = SourceFileStructure(sourceRoot)
-            javaFiles.rebuild()
+            val index = FileIndex.createNew(sourceRoot, destDir)
+            val forCompile1 = index.compileListPhase1()
+            compile2(this, forCompile1)
 
-            // Scan all already compiled class files
-            val classFiles = ClassesFileStricture(destDir)
-            classFiles.rebuild()
-            // Associate already compiled class files with respective sources
-            classFiles.associate(javaFiles)
-            // Cleanup the orphaned class files and directories
-            classFiles.cleanup()
-
-            // Get the list of sources, that needs to be compiled
-            val forCompile = javaFiles.forCompile()
-            compile(this, forCompile)
-
-            println(R["CompilationResult", forCompile.size])
+            println(R["CompilationResult", forCompile1.size])
+            compiledFilesPhase1 = forCompile1.size
             return 0
         } catch (e: TinycErrorException) {
             // If any error occurred, then print it and return respective error code

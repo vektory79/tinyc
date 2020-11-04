@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestMethodOrder
 import org.zeroturnaround.exec.ProcessExecutor
 import org.zeroturnaround.exec.stream.slf4j.Slf4jStream
+import picocli.CommandLine
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -15,7 +16,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @TestMethodOrder(OrderAnnotation::class)
-internal class TinycIT {
+internal class TinycTest {
 
     @Test
     @Order(1)
@@ -104,25 +105,19 @@ internal class TinycIT {
             SRC_DIR.toFile(),
             false
         )
-        val processResult = ProcessExecutor()
-            .command(
-                JAVA_PATH.toString(),
-//                "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:8000",
-                "-jar",
-                TINYC_JAR.toString(),
-                "--sourceroot",
-                SRC_DIR.toString(),
-                "--builddir",
-                BUILD_DIR.toString(),
-                * if (classpath != null) arrayOf("--classpath", classpath) else arrayOf()
-            )
-            .redirectOutput(Slf4jStream.of(Tinyc::class.java).asInfo())
-            .readOutput(true)
-            .execute()
-        if (processResult.exitValue == 0) {
-            assertEquals(R["CompilationResult", filesToCompile] + "\n", processResult.outputUTF8())
+
+        val tinyc = Tinyc()
+        val processResult = CommandLine(tinyc).setCommandName("tinyc").execute(
+            "--sourceroot",
+            SRC_DIR.toString(),
+            "--builddir",
+            BUILD_DIR.toString(),
+            * if (classpath != null) arrayOf("--classpath", classpath) else arrayOf()
+        )
+        if (processResult == 0) {
+            assertEquals(filesToCompile, tinyc.compiledFilesPhase1)
         }
-        return processResult.exitValue
+        return processResult
     }
 
     private fun runTest(mainClass: String, classpath: String? = null): String {
@@ -158,7 +153,7 @@ internal class TinycIT {
     companion object {
         private val JAVA_PATH = Tinyc().checkEnvironment().javaHome.resolve("bin").resolve("java")
         private val TEST_CLASS_DIR = Paths
-            .get(TinycIT::class.java.protectionDomain.codeSource.location.toURI())
+            .get(TinycTest::class.java.protectionDomain.codeSource.location.toURI())
         private val TESTS_DIR = TEST_CLASS_DIR.resolve("tests")
         private val SRC_DIR = TEST_CLASS_DIR
             .resolve("..")
@@ -170,10 +165,6 @@ internal class TinycIT {
             .normalize()
         private val CLASSES_DIR = BUILD_DIR
             .resolve("classes")
-            .normalize()
-        private val TINYC_JAR = TEST_CLASS_DIR
-            .resolve("..")
-            .resolve("tinyc.jar")
             .normalize()
     }
 }

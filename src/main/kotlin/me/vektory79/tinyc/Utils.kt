@@ -1,8 +1,6 @@
 package me.vektory79.tinyc
 
-import org.objectweb.asm.ClassReader
-import org.objectweb.asm.ClassVisitor
-import org.objectweb.asm.Opcodes
+import me.vektory79.tinyc.abi.FileInfoSource
 import org.zeroturnaround.exec.ProcessExecutor
 import org.zeroturnaround.exec.stream.slf4j.Slf4jStream
 import java.io.BufferedWriter
@@ -11,7 +9,6 @@ import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.Paths
 import java.util.*
 
 val R: ResourceBundle = ResourceBundle.getBundle("me.vektory79.tinyc.Messages")
@@ -27,6 +24,9 @@ operator fun ResourceBundle.get(key: String, arg1: Any?, vararg args: Any?): Str
 class TinycErrorException(val errorCode: Int, message: String, cause: Throwable? = null) :
     RuntimeException(message, cause)
 
+class IndexInconsistencyException(message: String, cause: Throwable? = null) :
+    RuntimeException(message, cause)
+
 fun Path.createDirs() {
     try {
         Files.createDirectories(this)
@@ -35,34 +35,14 @@ fun Path.createDirs() {
     }
 }
 
-class ClassSourceFinder : ClassVisitor(Opcodes.ASM9) {
-    var source: Path? = null
-    override fun visitSource(source: String?, debug: String?) {
-        if (source != null) {
-            this.source = Paths.get(source)
-        }
-        super.visitSource(source, debug)
-    }
-}
-
-fun extractSourceName(classFilePath: Path): Path {
-    val inputStream = Files.newInputStream(classFilePath)
-    inputStream.use {
-        val reader = ClassReader(inputStream)
-        val sourceFinder = ClassSourceFinder()
-        reader.accept(sourceFinder, ClassReader.SKIP_CODE or ClassReader.SKIP_FRAMES)
-        return sourceFinder.source
-            ?: throw TinycErrorException(4, R["DebugInfoMissing", classFilePath.toString()])
-    }
-}
-
-fun compile(config: Tinyc, forCompile: ArrayList<FileInfo>) {
-    if (forCompile.isEmpty()) {
-        return
-    }
+fun compile2(config: Tinyc, forCompile: List<FileInfoSource>) {
     val sourceList = config.buildDir.resolve("source-list.lst")
     if (Files.exists(sourceList)) {
         Files.delete(sourceList)
+    }
+
+    if (forCompile.isEmpty()) {
+        return
     }
 
     Files.createDirectories(sourceList.parent)
