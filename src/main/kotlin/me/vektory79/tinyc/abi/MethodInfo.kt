@@ -7,7 +7,7 @@ class MethodInfo(
     private val clazz: ClassInfo,
     val name: String
 ) : Serializable {
-    private val overrides = HashMap<String, MethodOverrideInfo>()
+    private val _overrides = HashMap<String, MethodOverrideInfo>()
 
     fun addOverride(
         access: Int,
@@ -16,27 +16,29 @@ class MethodInfo(
         signature: String?,
         exception: Array<out String>?
     ) {
-        overrides[descriptor] = MethodOverrideInfo(this, access, name, descriptor, signature, exception)
+        _overrides[descriptor] = MethodOverrideInfo(this, access, name, descriptor, signature, exception)
     }
 
+    val overrides: Stream<MethodOverrideInfo>
+        get() = _overrides.entries.stream().map { it.value }
+
     operator fun get(descriptor: String): MethodOverrideInfo? {
-        return overrides[descriptor]
+        return _overrides[descriptor]
     }
 
     fun walkUsages(): Stream<ClassInfo> {
-        return overrides.entries.stream().flatMap { it.value.walkUsages() }
+        return _overrides.entries.stream().flatMap { it.value.walkUsages() }
     }
 }
 
 class MethodOverrideInfo(
     private val method: MethodInfo,
-    val access: Int,
-    val name: String,
+    access: Int,
+    name: String,
     val descriptor: String,
-    val signature: String?,
+    signature: String?,
     val exception: Array<out String>?
-) : Serializable {
-    val visibility = Visibility.fromAccess(access)
+) : AbiElement<MethodOverrideInfo>(access, name, signature), Serializable {
     private val usages = HashSet<ClassInfo>()
 
     fun addUsage(ref: ClassInfo) {
@@ -46,6 +48,11 @@ class MethodOverrideInfo(
     fun walkUsages(): Stream<ClassInfo> {
         return usages.stream()
     }
+
+    override fun significantChangeIn(other: MethodOverrideInfo?): Boolean =
+        super.significantChangeIn(other)
+                || descriptor != other?.descriptor
+                || exception contentEquals other.exception
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

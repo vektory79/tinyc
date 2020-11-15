@@ -35,7 +35,7 @@ fun Path.createDirs() {
     }
 }
 
-fun compile2(config: Tinyc, forCompile: List<FileInfoSource>) {
+fun compile(config: Tinyc, forCompile: List<FileInfoSource>) {
     val sourceList = config.buildDir.resolve("source-list.lst")
     if (Files.exists(sourceList)) {
         Files.delete(sourceList)

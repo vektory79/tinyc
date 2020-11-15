@@ -5,12 +5,11 @@ import java.util.stream.Stream
 
 class FieldInfo(
     private val clazz: ClassInfo,
-    val access: Int,
-    val name: String,
+    access: Int,
+    name: String,
     val descriptor: String,
-    val signature: String?
-) : Serializable {
-    val visibility = Visibility.fromAccess(access)
+    signature: String?
+) : AbiElement<FieldInfo>(access, name, signature), Serializable {
     private val usages = HashSet<ClassInfo>()
 
     fun addUsage(ref: ClassInfo) {
@@ -21,23 +20,25 @@ class FieldInfo(
         return usages.stream()
     }
 
+    override fun significantChangeIn(other: FieldInfo?): Boolean =
+        super.significantChangeIn(other)
+                || descriptor != other?.descriptor
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (other !is FieldInfo) return false
+        if (javaClass != other?.javaClass) return false
+        if (!super.equals(other)) return false
 
-        if (name != other.name) return false
+        other as FieldInfo
+
         if (descriptor != other.descriptor) return false
-        if (signature != other.signature) return false
-        if (access != other.access) return false
 
         return true
     }
 
     override fun hashCode(): Int {
-        var result = name.hashCode()
+        var result = super.hashCode()
         result = 31 * result + descriptor.hashCode()
-        result = 31 * result + signature.hashCode()
-        result = 31 * result + access
         return result
     }
 }

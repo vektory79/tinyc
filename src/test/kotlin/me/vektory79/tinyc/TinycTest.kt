@@ -21,7 +21,7 @@ internal class TinycTest {
     @Test
     @Order(1)
     fun test1() {
-        assertEquals(0, compileTest(1, 1), "The compilation should be completed successfully")
+        assertEquals(0, compileTest(1, 1, 0), "The compilation should be completed successfully")
         assertEquals("Hello, world!!!\n", runTest("Main"))
         assertClassesPresent(
             "Main",
@@ -32,7 +32,7 @@ internal class TinycTest {
     @Test
     @Order(2)
     fun test2() {
-        assertEquals(0, compileTest(2, 1), "The compilation should be completed successfully")
+        assertEquals(0, compileTest(2, 1, 0), "The compilation should be completed successfully")
         assertEquals("Hello, world!!!\n", runTest("Main"))
         assertClassesPresent(
             "Main",
@@ -45,7 +45,7 @@ internal class TinycTest {
     @Test
     @Order(3)
     fun test3() {
-        assertEquals(0, compileTest(3, 2), "The compilation should be completed successfully")
+        assertEquals(0, compileTest(3, 2, 0), "The compilation should be completed successfully")
         assertEquals("Hello, world!!!\n", runTest("test.package1.Main"))
         assertClassesPresent(
             "test.package1.Main",
@@ -61,7 +61,7 @@ internal class TinycTest {
     fun test4() {
         // Ensure, that the file modification is countable between two tests
         Thread.sleep(1000)
-        assertEquals(0, compileTest(4, 1, clean = false), "The compilation should be completed successfully")
+        assertEquals(0, compileTest(4, 1, 0, clean = false), "The compilation should be completed successfully")
         assertEquals("Hello, world, ever!!!\n", runTest("test.package1.Main"))
         assertClassesPresent(
             "test.package1.Main",
@@ -75,7 +75,7 @@ internal class TinycTest {
     @Test
     @Order(5)
     fun test5() {
-        assertEquals(0, compileTest(5, 1), "The compilation should be completed successfully")
+        assertEquals(0, compileTest(5, 1, 0), "The compilation should be completed successfully")
         assertEquals("Hello, world!!!\n", runTest("test.package1.Main"))
         assertClassesPresent(
             "test.package1.Main",
@@ -93,10 +93,10 @@ internal class TinycTest {
     @Test
     @Order(6)
     fun test6() {
-        assertEquals(1, compileTest(6, 1), "Compilation should file")
+        assertEquals(1, compileTest(6, 1, 0), "Compilation should file")
     }
 
-    private fun compileTest(testId: Int, filesToCompile: Int, classpath: String? = null, clean: Boolean = true): Int {
+    private fun compileTest(testId: Int, filesToCompile1: Int, filesToCompile2: Int, classpath: String? = null, clean: Boolean = true): Int {
         if (Files.exists(SRC_DIR) && clean) {
             FileUtils.cleanDirectory(SRC_DIR.toFile())
         }
@@ -115,7 +115,8 @@ internal class TinycTest {
             * if (classpath != null) arrayOf("--classpath", classpath) else arrayOf()
         )
         if (processResult == 0) {
-            assertEquals(filesToCompile, tinyc.compiledFilesPhase1)
+            assertEquals(filesToCompile1, tinyc.compiledFilesPhase1)
+            assertEquals(filesToCompile2, tinyc.compiledFilesPhase2)
         }
         return processResult
     }

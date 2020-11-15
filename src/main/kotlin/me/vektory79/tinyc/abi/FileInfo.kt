@@ -40,6 +40,8 @@ class FileInfoSource(
 ) : FileInfo(pkg, name) {
     internal val classes = HashMap<String, ClassInfo>()
 
+    operator fun get(name: String): ClassInfo? = classes[name]
+
     fun addClass(clazz: ClassInfo) {
         classes[clazz.name] = clazz
     }
@@ -57,11 +59,11 @@ class FileInfoCompiled(
 ) : FileInfo(pkg, name) {
     var clazz: ClassInfo? = null
     var sourceFile: Path? = null
-    var source: FileInfoSource? = null
+    val source: FileInfoSource?
+        get() = pkg.getSource(sourceFile!!)
 
     fun associateToSource() {
         if (sourceFile != null) {
-            source = pkg.getSource(sourceFile!!)
             source?.addClass(clazz!!)
         } else {
             clazz?.forceRecompile = true

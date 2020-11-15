@@ -26,6 +26,73 @@ class FileIndex private constructor(
         ).toList()
     }
 
+    fun compileListPhase2(forCompile1: List<FileInfoSource>): List<FileInfoSource> {
+        val result = ArrayList<FileInfoSource>()
+        val compiled = scanAllCompiled(forCompile1)
+        val breadCrumb = HashSet<FileInfoSource>()
+        compiled
+            .mapNotNull { it.source }
+            .forEach { breadCrumb.add(it) }
+
+        compiled.forEach { recompiledClass ->
+            val newClass = recompiledClass.clazz!!
+            val oldClass = recompiledClass.source!![newClass.name]
+
+            val newFields = newClass.fields
+            val oldFields = oldClass?.fields
+
+            val newMethods = newClass.methods
+            val oldMethods = oldClass?.methods
+
+            if (newClass significantChangeIn oldClass) {
+                newClass
+                    .walkInheritance()
+                    .map { it.file.source }
+                    .filter { it != null }
+                    .filter { !breadCrumb.contains(it) }
+                    .forEach {
+                        breadCrumb.add(it!!)
+                        result.add(it)
+                    }
+            }
+
+            oldFields
+                ?.stream()
+                // Skip all unchanged fields
+                ?.filter { !newFields.contains(it) }
+                // Filter the significant changes in field declaration only
+                ?.filter { it significantChangeIn recompiledClass.clazz?.field(it.name) }
+                // Walk all classes, that uses changed field
+                ?.flatMap { it.walkUsages() }
+                ?.map { it.file.source }
+                ?.filter { it != null }
+                // Skip the repeated entries
+                ?.filter { !breadCrumb.contains(it) }
+                ?.forEach {
+                    breadCrumb.add(it!!)
+                    result.add(it)
+                }
+
+            oldMethods
+                ?.stream()
+                // Skip all unchanged methods
+                ?.filter { !newMethods.contains(it) }
+                // Filter the significant changes in method declaration only
+                ?.filter { it significantChangeIn recompiledClass.clazz?.method(it.name)?.get(it.descriptor) }
+                // Walk all classes, that uses changed method
+                ?.flatMap { it.walkUsages() }
+                ?.map { it.file.source }
+                ?.filter { it != null }
+                // Skip the repeated entries
+                ?.filter { !breadCrumb.contains(it) }
+                ?.forEach {
+                    breadCrumb.add(it!!)
+                    result.add(it)
+                }
+        }
+        return result
+    }
+
     private fun build() {
         scanAllSources()
         scanAllCompiled()
@@ -44,22 +111,36 @@ class FileIndex private constructor(
                 .addSource(file.fileName)
         }
 
-    private fun scanAllCompiled() = Files
-        .walk(compiledRoot)
-        .filter { it.toString().endsWith(COMPILED_EXTENSION) }
-        .map { compiledRoot.relativize(it) }
-        .forEach(this@FileIndex::scanAbiForClassFile)
+    private fun scanAllCompiled(forCompile1: List<FileInfoSource>? = null): List<FileInfoCompiled> {
+        val affectingClassFiles = ArrayList<FileInfoCompiled>()
+        Files
+            .walk(compiledRoot)
+            .filter { it.toString().endsWith(COMPILED_EXTENSION) }
+            .forEach { file ->
+                this@FileIndex.scanAbiForClassFile(file, forCompile1)?.apply {
+                    affectingClassFiles.add(this)
+                }
+            }
+        return affectingClassFiles
+    }
 
-    private fun scanAbiForClassFile(file: Path) {
-        val packagePath = file.parent ?: Paths.get(".")
+    private fun scanAbiForClassFile(file: Path, forCompile1: List<FileInfoSource>?): FileInfoCompiled? {
+        val affectingSources = HashSet<Path>()
+        forCompile1?.forEach { affectingSources.add(it.name) }
+
+        val packagePath = compiledRoot.relativize(file).parent ?: Paths.get(".")
         val pkg = packages.computeIfAbsent(packagePath) { Package(this, packagePath) }
         val info = FileInfoCompiled(pkg, file.fileName)
-        pkg.addCompiled(info)
+        var doScan = false
         scanAbi(
-            compiledRoot.resolve(file),
+            file,
             object : AbiScannerCallback {
                 override fun sourceFile(name: Path?) {
                     info.sourceFile = name
+                    doScan = forCompile1 == null || name == null || affectingSources.contains(name)
+                    if (doScan) {
+                        pkg.addCompiled(info)
+                    }
                 }
 
                 override fun clazz(
@@ -69,6 +150,7 @@ class FileIndex private constructor(
                     superName: String?,
                     interfaces: Array<out String>?
                 ) {
+                    // Always creating ClassInfo because source file will be determined after this point
                     info.clazz = ClassInfo(info, access, name, signature, superName, interfaces)
                 }
 
@@ -78,7 +160,9 @@ class FileIndex private constructor(
                     descriptor: String,
                     signature: String?
                 ) {
-                    info.clazz?.addField(access, name, descriptor, signature)
+                    if (doScan) {
+                        info.clazz?.addField(access, name, descriptor, signature)
+                    }
                 }
 
                 override fun method(
@@ -88,10 +172,13 @@ class FileIndex private constructor(
                     signature: String?,
                     exception: Array<out String>?
                 ) {
-                    info.clazz?.addMethod(access, name, descriptor, signature, exception)
+                    if (doScan) {
+                        info.clazz?.addMethod(access, name, descriptor, signature, exception)
+                    }
                 }
             }
         )
+        return if (doScan) info else null
     }
 
     private fun usageScan() = walkCompiled().forEach { compiledFile ->
@@ -110,7 +197,7 @@ class FileIndex private constructor(
                     adder: ClassInfo.(ClassInfo) -> Unit
                 ) {
                     val targetClassFile = targetClassFile(className)
-                    compiledFile.clazz?.run {
+                    compiledFile.clazz?.apply {
                         if (targetClassFile != null) {
                             targetClassFile.clazz?.adder(this)
                         } else {

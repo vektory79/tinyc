@@ -71,6 +71,7 @@ class Tinyc : Callable<Int> {
         get() = _javac!!
     
     internal var compiledFilesPhase1 = 0
+    internal var compiledFilesPhase2 = 0
 
     /**
      * The main processing function, tha do all the work.
@@ -82,10 +83,17 @@ class Tinyc : Callable<Int> {
             // Scan all sources
             val index = FileIndex.createNew(sourceRoot, destDir)
             val forCompile1 = index.compileListPhase1()
-            compile2(this, forCompile1)
+            compile(this, forCompile1)
 
-            println(R["CompilationResult", forCompile1.size])
+            println(R["CompilationPhase1", forCompile1.size])
             compiledFilesPhase1 = forCompile1.size
+
+            val forCompile2 = index.compileListPhase2(forCompile1)
+            compile(this, forCompile2)
+
+            println(R["CompilationPhase2", forCompile2.size])
+            compiledFilesPhase2 = forCompile2.size
+            println(R["CompilationResult", compiledFilesPhase1 + compiledFilesPhase2])
             return 0
         } catch (e: TinycErrorException) {
             // If any error occurred, then print it and return respective error code

@@ -6,17 +6,16 @@ import java.util.stream.Stream
 
 class ClassInfo(
     val file: FileInfoCompiled,
-    val access: Int,
-    val name: String,
-    val signature: String?,
+    access: Int,
+    name: String,
+    signature: String?,
     val superName: String?,
     val interfaces: Array<out String>?
-) : Serializable {
-    val visibility = Visibility.fromAccess(access)
+) : AbiElement<ClassInfo>(access, name, signature),  Serializable {
     private val inheritance = HashSet<ClassInfo>()
     private val usages = HashSet<ClassInfo>()
-    private val fields = HashMap<String, FieldInfo>()
-    private val methods = HashMap<String, MethodInfo>()
+    private val _fields = HashMap<String, FieldInfo>()
+    private val _methods = HashMap<String, MethodInfo>()
 
     /**
      * The flag, that forces recompilation of this class.
@@ -44,25 +43,41 @@ class ClassInfo(
         return usages.stream()
     }
 
+    val fields: Set<FieldInfo>
+        get() = _fields.values.toSet()
+
+    val fieldsUsages: Stream<ClassInfo>
+        get() = _fields.entries.stream().flatMap { it.value.walkUsages() }
+
+    fun field(name: String): FieldInfo? = _fields[name]
+
     fun addField(
         access: Int,
         name: String,
         descriptor: String,
         signature: String?
     ) {
-        fields[name] = FieldInfo(this, access, name, descriptor, signature)
+        _fields[name] = FieldInfo(this, access, name, descriptor, signature)
     }
 
     fun addFieldUsage(usageClass: ClassInfo, fieldName: String) {
-        val fieldInfo = fields[fieldName] ?: throw IndexInconsistencyException(
+        val fieldInfo = _fields[fieldName] ?: throw IndexInconsistencyException(
             "Can't find field for usage: ${usageClass.name}.$fieldName"
         )
         fieldInfo.addUsage(usageClass)
     }
 
-    fun walkFieldsUsages(): Stream<ClassInfo> {
-        return fields.entries.stream().flatMap { it.value.walkUsages() }
-    }
+    val methods: Set<MethodOverrideInfo>
+        get() {
+            val result = HashSet<MethodOverrideInfo>()
+            _methods.entries.stream().flatMap { it.value.overrides }.forEach { result.add(it) }
+            return result
+        }
+
+    val methodsUsages: Stream<ClassInfo>
+        get() = _methods.entries.stream().flatMap { it.value.walkUsages() }
+
+    fun method(name: String): MethodInfo? = _methods[name]
 
     fun addMethod(
         access: Int,
@@ -71,29 +86,31 @@ class ClassInfo(
         signature: String?,
         exception: Array<out String>?
     ) {
-        methods
+        _methods
             .computeIfAbsent(name) { MethodInfo(this, it) }
             .addOverride(access, name, descriptor, signature, exception)
     }
 
     fun addMethodUsage(usageClass: ClassInfo, name: String, descriptor: String) {
-        val overrideInfo = methods[name]?.get(descriptor) ?: throw IndexInconsistencyException(
+        val overrideInfo = _methods[name]?.get(descriptor) ?: throw IndexInconsistencyException(
             "Can't find method for usage: ${usageClass.name}.$name($descriptor)"
         )
         overrideInfo.addUsage(usageClass)
     }
 
-    fun walkMethodsUsages(): Stream<ClassInfo> {
-        return methods.entries.stream().flatMap { it.value.walkUsages() }
-    }
+    override fun significantChangeIn(other: ClassInfo?): Boolean =
+        super.significantChangeIn(other)
+                || this != other
+                || this.fields.filter { !it.static } != other.fields.filter { !it.static }
+                || this.methods.filter { !it.static } != other.methods.filter { !it.static }
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (other !is ClassInfo) return false
+        if (javaClass != other?.javaClass) return false
+        if (!super.equals(other)) return false
 
-        if (access != other.access) return false
-        if (name != other.name) return false
-        if (signature != other.signature) return false
+        other as ClassInfo
+
         if (superName != other.superName) return false
         if (interfaces != null) {
             if (other.interfaces == null) return false
@@ -104,12 +121,9 @@ class ClassInfo(
     }
 
     override fun hashCode(): Int {
-        var result = access
-        result = 31 * result + name.hashCode()
-        result = 31 * result + (signature?.hashCode() ?: 0)
+        var result = super.hashCode()
         result = 31 * result + (superName?.hashCode() ?: 0)
         result = 31 * result + (interfaces?.contentHashCode() ?: 0)
         return result
     }
-
 }

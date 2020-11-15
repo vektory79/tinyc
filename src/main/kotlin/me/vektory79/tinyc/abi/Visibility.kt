@@ -5,15 +5,16 @@ import me.vektory79.tinyc.TinycErrorException
 import me.vektory79.tinyc.get
 import org.objectweb.asm.Opcodes
 
-enum class Visibility(private val scope: Int) {
-    PRIVATE(0),
-    PROTECTED(1),
-    INTERNAL(2),
-    PUBLIC(3);
+enum class Visibility {
+    PRIVATE,
+    PROTECTED,
+    INTERNAL,
+    PUBLIC;
 
-    infix fun lessThan(other: Visibility): Boolean {
-        return this.scope < other.scope
-    }
+    infix fun significantChangeIn(other: Visibility): Boolean =
+        (this != PRIVATE && other == PRIVATE)
+                || (this == PUBLIC && other != PUBLIC)
+                || ((this == INTERNAL || this == PROTECTED) && (other == INTERNAL || other == PROTECTED) && this != other)
 
     companion object {
         fun fromAccess(access: Int): Visibility {
