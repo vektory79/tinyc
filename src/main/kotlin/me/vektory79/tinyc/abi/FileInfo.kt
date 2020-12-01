@@ -1,5 +1,6 @@
 package me.vektory79.tinyc.abi
 
+import me.vektory79.tinyc.div
 import java.io.Serializable
 import java.nio.file.Files
 import java.nio.file.Path
@@ -50,7 +51,7 @@ class FileInfoSource(
         get() = classes.isEmpty()
 
     override val fullPath: Path
-        get() = pkg.index.sourceRoot.resolve(pkg.path).resolve(name)
+        get() = pkg.index.sourceRoot / pkg.path / name
 }
 
 class FileInfoCompiled(
@@ -71,5 +72,5 @@ class FileInfoCompiled(
     }
 
     override val fullPath: Path
-        get() = pkg.index.compiledRoot.resolve(pkg.path).resolve(name).normalize()
+        get() = (pkg.index.compiledRoot / pkg.path / name).normalize()
 }

@@ -7,8 +7,8 @@ class FieldInfo(
     private val clazz: ClassInfo,
     access: Int,
     name: String,
-    val descriptor: String,
-    signature: String?
+    private val descriptor: String,
+    signature: String?,
 ) : AbiElement<FieldInfo>(access, name, signature), Serializable {
     private val usages = HashSet<ClassInfo>()
 

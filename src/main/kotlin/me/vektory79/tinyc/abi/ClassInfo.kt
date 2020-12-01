@@ -1,6 +1,5 @@
 package me.vektory79.tinyc.abi
 
-import me.vektory79.tinyc.IndexInconsistencyException
 import java.io.Serializable
 import java.util.stream.Stream
 
@@ -9,9 +8,9 @@ class ClassInfo(
     access: Int,
     name: String,
     signature: String?,
-    val superName: String?,
-    val interfaces: Array<out String>?
-) : AbiElement<ClassInfo>(access, name, signature),  Serializable {
+    private val superName: String?,
+    private val interfaces: Array<out String>?
+) : AbiElement<ClassInfo>(access, name, signature), Serializable {
     private val inheritance = HashSet<ClassInfo>()
     private val usages = HashSet<ClassInfo>()
     private val _fields = HashMap<String, FieldInfo>()
@@ -29,10 +28,19 @@ class ClassInfo(
     }
 
     fun walkInheritance(): Stream<ClassInfo> {
-        return Stream.concat(
-            Stream.of(this),
-            inheritance.stream().flatMap { walkInheritance() }
-        )
+        val inheritance = this
+            .file
+            .source
+            ?.get(name)
+            ?.inheritance
+            ?.stream()
+            ?.flatMap {
+                Stream.concat(Stream.of(it), it.walkInheritance())
+            }
+        if (inheritance != null) {
+            return inheritance
+        }
+        return Stream.empty()
     }
 
     fun addUsage(ref: ClassInfo) {
@@ -46,25 +54,19 @@ class ClassInfo(
     val fields: Set<FieldInfo>
         get() = _fields.values.toSet()
 
-    val fieldsUsages: Stream<ClassInfo>
-        get() = _fields.entries.stream().flatMap { it.value.walkUsages() }
-
     fun field(name: String): FieldInfo? = _fields[name]
 
     fun addField(
         access: Int,
         name: String,
         descriptor: String,
-        signature: String?
+        signature: String?,
     ) {
         _fields[name] = FieldInfo(this, access, name, descriptor, signature)
     }
 
     fun addFieldUsage(usageClass: ClassInfo, fieldName: String) {
-        val fieldInfo = _fields[fieldName] ?: throw IndexInconsistencyException(
-            "Can't find field for usage: ${usageClass.name}.$fieldName"
-        )
-        fieldInfo.addUsage(usageClass)
+        _fields[fieldName]?.addUsage(usageClass)
     }
 
     val methods: Set<MethodOverrideInfo>
@@ -73,9 +75,6 @@ class ClassInfo(
             _methods.entries.stream().flatMap { it.value.overrides }.forEach { result.add(it) }
             return result
         }
-
-    val methodsUsages: Stream<ClassInfo>
-        get() = _methods.entries.stream().flatMap { it.value.walkUsages() }
 
     fun method(name: String): MethodInfo? = _methods[name]
 
@@ -92,10 +91,7 @@ class ClassInfo(
     }
 
     fun addMethodUsage(usageClass: ClassInfo, name: String, descriptor: String) {
-        val overrideInfo = _methods[name]?.get(descriptor) ?: throw IndexInconsistencyException(
-            "Can't find method for usage: ${usageClass.name}.$name($descriptor)"
-        )
-        overrideInfo.addUsage(usageClass)
+        _methods[name]?.get(descriptor)?.addUsage(usageClass)
     }
 
     override fun significantChangeIn(other: ClassInfo?): Boolean =

@@ -7,9 +7,7 @@ import org.apache.commons.lang3.SystemUtils
 import org.slf4j.LoggerFactory
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
-import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.Paths
 import java.util.concurrent.Callable
 import java.util.logging.LogManager
 
@@ -38,7 +36,7 @@ class Tinyc : Callable<Int> {
      * The Java sources root directory.
      */
     @field:Option(names = ["-s", "--sourceroot"], paramLabel = DIR_PLACEHOLDER, descriptionKey = "sourceroot")
-    var sourceRoot: Path = Paths.get(".").toAbsolutePath().normalize()
+    var sourceRoot: Path = path(".").toAbsolutePath().normalize()
 
     @field:Option(names = ["-b", "--builddir"], paramLabel = DIR_PLACEHOLDER, descriptionKey = "builddir")
     private var _buildDir: Path? = null
@@ -69,7 +67,7 @@ class Tinyc : Callable<Int> {
      */
     val javac: Path
         get() = _javac!!
-    
+
     internal var compiledFilesPhase1 = 0
     internal var compiledFilesPhase2 = 0
 
@@ -83,16 +81,15 @@ class Tinyc : Callable<Int> {
             // Scan all sources
             val index = FileIndex.createNew(sourceRoot, destDir)
             val forCompile1 = index.compileListPhase1()
-            compile(this, forCompile1)
-
-            println(R["CompilationPhase1", forCompile1.size])
             compiledFilesPhase1 = forCompile1.size
+            compile(this, forCompile1)
+            println(R["CompilationPhase1", forCompile1.size])
 
             val forCompile2 = index.compileListPhase2(forCompile1)
-            compile(this, forCompile2)
-
-            println(R["CompilationPhase2", forCompile2.size])
             compiledFilesPhase2 = forCompile2.size
+            compile(this, forCompile2)
+            println(R["CompilationPhase2", forCompile2.size])
+
             println(R["CompilationResult", compiledFilesPhase1 + compiledFilesPhase2])
             return 0
         } catch (e: TinycErrorException) {
@@ -107,18 +104,18 @@ class Tinyc : Callable<Int> {
     }
 
     internal fun checkEnvironment(): Tinyc {
-        _buildDir = _buildDir ?: Paths.get("..", "build").toAbsolutePath().normalize()
-        _destDir = _destDir ?: buildDir.resolve("classes").toAbsolutePath().normalize()
+        _buildDir = _buildDir ?: path("..", "build").toAbsolutePath().normalize()
+        _destDir = _destDir ?: (buildDir / "classes").toAbsolutePath().normalize()
 
-        _javaHome = Paths.get(System.getenv("JAVA_HOME") ?: throw TinycErrorException(5, R["JavaHomeNotSet"]))
-        _javac = javaHome.resolve("bin")
-        _javac = if (SystemUtils.IS_OS_WINDOWS) javac.resolve("javac.exe") else javac.resolve("javac")
+        _javaHome = path(System.getenv("JAVA_HOME") ?: throw TinycErrorException(5, R["JavaHomeNotSet"]))
+        _javac = javaHome / "bin"
+        _javac = if (SystemUtils.IS_OS_WINDOWS) javac / "javac.exe" else javac / "javac"
 
-        if (!Files.exists(javac)) {
+        if (!javac.exists) {
             throw TinycErrorException(6, R["JavacNotFound", javac])
         }
 
-        if (!Files.exists(sourceRoot)) {
+        if (!sourceRoot.exists) {
             throw TinycErrorException(3, R["IncorrectSourceDir", sourceRoot])
         }
         destDir.createDirs()

@@ -25,10 +25,6 @@ class MethodInfo(
     operator fun get(descriptor: String): MethodOverrideInfo? {
         return _overrides[descriptor]
     }
-
-    fun walkUsages(): Stream<ClassInfo> {
-        return _overrides.entries.stream().flatMap { it.value.walkUsages() }
-    }
 }
 
 class MethodOverrideInfo(

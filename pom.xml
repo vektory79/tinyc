@@ -16,6 +16,7 @@
         <kotlin.code.style>official</kotlin.code.style>
         <kotlin.compiler.jvmTarget>11</kotlin.compiler.jvmTarget>
         <!-- Dependencies versions -->
+        <kotlin.version>1.4.20</kotlin.version>
         <picocli.version>4.5.1</picocli.version>
         <zt-exec.version>1.12</zt-exec.version>
         <asm.version>9.0</asm.version>
@@ -24,7 +25,6 @@
         <slf4j-simple.version>1.7.30</slf4j-simple.version>
         <commons-io.version>2.8.0</commons-io.version>
         <!-- Plugins versions -->
-        <kotlin-maven-plugin.version>1.4.10</kotlin-maven-plugin.version>
         <graal.version>20.2.0</graal.version>
         <exec-maven-plugin.version>1.6.0</exec-maven-plugin.version>
         <maven-enforcer-plugin.version>3.0.0-M3</maven-enforcer-plugin.version>
@@ -56,7 +56,7 @@
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-stdlib-jdk8</artifactId>
-            <version>${kotlin-maven-plugin.version}</version>
+            <version>${kotlin.version}</version>
         </dependency>
         <dependency>
             <groupId>info.picocli</groupId>
@@ -98,7 +98,7 @@
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-test-junit5</artifactId>
-            <version>${kotlin-maven-plugin.version}</version>
+            <version>${kotlin.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -162,7 +162,7 @@
             <plugin>
                 <groupId>org.jetbrains.kotlin</groupId>
                 <artifactId>kotlin-maven-plugin</artifactId>
-                <version>${kotlin-maven-plugin.version}</version>
+                <version>${kotlin.version}</version>
                 <executions>
                     <execution>
                         <id>kapt</id>
@@ -185,7 +185,7 @@
                     </execution>
                     <execution>
                         <id>compile</id>
-                        <phase>compile</phase>
+                        <phase>process-sources</phase>
                         <goals>
                             <goal>compile</goal>
                         </goals>
@@ -208,26 +208,7 @@
                     <environmentVariables>
                         <JAVA_HOME>${java.home}</JAVA_HOME>
                     </environmentVariables>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-failsafe-plugin</artifactId>
-                <version>${maven-failsafe-plugin.version}</version>
-                <executions>
-                    <execution>
-                        <id>integration-tests</id>
-                        <goals>
-                            <goal>integration-test</goal>
-                            <goal>verify</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <trimStackTrace>false</trimStackTrace>
-                    <environmentVariables>
-                        <JAVA_HOME>${java.home}</JAVA_HOME>
-                    </environmentVariables>
+<!--                    <argLine>-XX:StartFlightRecording=disk=true,maxsize=10g,maxage=24h,settings=${project.basedir}/Continuous_Profiling_heavy.jfc,filename=${project.build.directory}/recording.jfr -XX:FlightRecorderOptions=repository=${project.build.directory}/diagnostics/,maxchunksize=50m,stackdepth=1024</argLine>-->
                 </configuration>
             </plugin>
 

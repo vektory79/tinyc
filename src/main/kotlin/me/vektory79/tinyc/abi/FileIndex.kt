@@ -1,10 +1,13 @@
 package me.vektory79.tinyc.abi
 
-import me.vektory79.tinyc.*
+import me.vektory79.tinyc.path
+import me.vektory79.tinyc.scanners.AbiScannerCallback
+import me.vektory79.tinyc.scanners.UsageScannerCallback
+import me.vektory79.tinyc.scanners.classUsageScan
+import me.vektory79.tinyc.scanners.scanAbi
 import java.io.Serializable
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.Paths
 import java.util.stream.Stream
 import kotlin.streams.toList
 
@@ -17,13 +20,12 @@ class FileIndex private constructor(
 
     fun compileListPhase1(): List<FileInfoSource> {
         val breadCrumb = HashSet<FileInfoSource>()
-        return Stream.concat(
-            Stream.concat(
-                orphanCompiled(breadCrumb),
-                notCompiledSources(breadCrumb)
-            ),
-            outdated(breadCrumb)
-        ).toList()
+        return Stream.of(
+            orphanCompiled(breadCrumb),
+            notCompiledSources(breadCrumb),
+            outdated(breadCrumb),
+            forcedToRecompile(breadCrumb)
+        ).flatMap { it }.toList()
     }
 
     fun compileListPhase2(forCompile1: List<FileInfoSource>): List<FileInfoSource> {
@@ -105,7 +107,7 @@ class FileIndex private constructor(
         .filter { it.toString().endsWith(sourceExtension) }
         .map { sourceRoot.relativize(it) }
         .forEach { file ->
-            val packagePath = file.parent ?: Paths.get(".")
+            val packagePath = file.parent ?: path(".")
             packages
                 .computeIfAbsent(packagePath) { Package(this, packagePath) }
                 .addSource(file.fileName)
@@ -128,7 +130,7 @@ class FileIndex private constructor(
         val affectingSources = HashSet<Path>()
         forCompile1?.forEach { affectingSources.add(it.name) }
 
-        val packagePath = compiledRoot.relativize(file).parent ?: Paths.get(".")
+        val packagePath = compiledRoot.relativize(file).parent ?: path(".")
         val pkg = packages.computeIfAbsent(packagePath) { Package(this, packagePath) }
         val info = FileInfoCompiled(pkg, file.fileName)
         var doScan = false
@@ -158,7 +160,7 @@ class FileIndex private constructor(
                     access: Int,
                     name: String,
                     descriptor: String,
-                    signature: String?
+                    signature: String?,
                 ) {
                     if (doScan) {
                         info.clazz?.addField(access, name, descriptor, signature)
@@ -200,14 +202,12 @@ class FileIndex private constructor(
                     compiledFile.clazz?.apply {
                         if (targetClassFile != null) {
                             targetClassFile.clazz?.adder(this)
-                        } else {
-                            forceRecompile = true
                         }
                     }
                 }
 
                 private fun targetClassFile(className: String): FileInfoCompiled? {
-                    val classPath = Paths.get("$className.class")
+                    val classPath = path("$className.class")
                     return packages[classPath.parent]?.getCompiled(classPath.fileName)
                 }
             }
@@ -220,8 +220,8 @@ class FileIndex private constructor(
 
     private fun walkSources(): Stream<FileInfoSource> = packages.entries.stream().flatMap { it.value.walkSources() }
 
-    private fun orphanCompiled(breadCrumb: HashSet<FileInfoSource>): Stream<FileInfoSource> {
-        return walkCompiled()
+    private fun orphanCompiled(breadCrumb: HashSet<FileInfoSource>): Stream<FileInfoSource> =
+        walkCompiled()
             // Filtering orphaned class files
             .filter { it.source == null }
             .peek { removeFile(it) }
@@ -234,15 +234,21 @@ class FileIndex private constructor(
                     ).map { it.file.source }
                     .filter { it != null && breadCrumb.add(it) }
             }
-    }
 
-    private fun outdated(breadCrumb: HashSet<FileInfoSource>): Stream<FileInfoSource> {
-        return walkCompiled()
+    private fun forcedToRecompile(breadCrumb: HashSet<FileInfoSource>): Stream<FileInfoSource> =
+        walkCompiled()
+            .map { it.clazz }
+            .filter { it?.forceRecompile ?: false }
+            .map { it?.file?.source }
+            .filter { it != null && breadCrumb.add(it) }
+            .map { it as FileInfoSource }
+
+    private fun outdated(breadCrumb: HashSet<FileInfoSource>): Stream<FileInfoSource> =
+        walkCompiled()
             .filter { it.source != null && it olderThan it.source!! }
             .peek { removeFile(it) }
             .map { it.source!! }
             .filter { breadCrumb.add(it) }
-    }
 
     private fun removeFile(compiledFile: FileInfoCompiled) {
         // Remove orphaned class file

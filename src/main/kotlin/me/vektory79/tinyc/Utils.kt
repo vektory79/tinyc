@@ -6,9 +6,11 @@ import org.zeroturnaround.exec.stream.slf4j.Slf4jStream
 import java.io.BufferedWriter
 import java.io.FileWriter
 import java.io.IOException
+import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.util.*
 
 val R: ResourceBundle = ResourceBundle.getBundle("me.vektory79.tinyc.Messages")
@@ -24,8 +26,8 @@ operator fun ResourceBundle.get(key: String, arg1: Any?, vararg args: Any?): Str
 class TinycErrorException(val errorCode: Int, message: String, cause: Throwable? = null) :
     RuntimeException(message, cause)
 
-class IndexInconsistencyException(message: String, cause: Throwable? = null) :
-    RuntimeException(message, cause)
+fun path(first: String, vararg more: String): Path = Paths.get(first, *more)
+fun path(first: URI): Path = Paths.get(first)
 
 fun Path.createDirs() {
     try {
@@ -35,9 +37,15 @@ fun Path.createDirs() {
     }
 }
 
+val Path.exists
+    get() = Files.exists(this)
+
+operator fun Path.div(value: Path): Path = this.resolve(value)
+operator fun Path.div(value: String): Path = this.resolve(value)
+
 fun compile(config: Tinyc, forCompile: List<FileInfoSource>) {
-    val sourceList = config.buildDir.resolve("source-list.lst")
-    if (Files.exists(sourceList)) {
+    val sourceList = config.buildDir / "source-list.lst"
+    if (sourceList.exists) {
         Files.delete(sourceList)
     }
 
@@ -66,7 +74,10 @@ fun compile(config: Tinyc, forCompile: List<FileInfoSource>) {
             "11",
             "-encoding",
             "UTF-8",
-            * if (config.classpath != null) arrayOf("-classpath", config.classpath) else arrayOf()
+            * if (config.classpath != null) arrayOf("-classpath", "${config.destDir}:${config.classpath}") else arrayOf(
+                "-classpath",
+                config.destDir.toString()
+            )
         )
         .redirectOutput(Slf4jStream.of(Tinyc::class.java).asInfo())
         .readOutput(true)
